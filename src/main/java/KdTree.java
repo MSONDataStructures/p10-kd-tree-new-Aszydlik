@@ -52,10 +52,6 @@ public class KdTree {
         return n;
     }
 
-    public boolean contains(Point2D p) {
-        if (p == null) throw new IllegalArgumentException();
-        return contains(root, p, true);
-    }
 
     private boolean contains(Node n, Point2D p, boolean vertical) {
         if (n == null) return false;
