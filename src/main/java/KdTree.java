@@ -1,126 +1,126 @@
-/**
- * Description: Represents a set of points in the unit square
- * (all points have x- and y-coordinates between 0 and 1)
- * using <code>algs4.Point2D</code> to represent a point,
- * <code>algs4.RectHV</code> to represent a rectangle,
- * a red-black BST (used in <code>algs4.SET</code> or <code>java.util.TreeSet</code>)
- * to support range search (find all the points contained in a query rectangle)
- * and nearest-neighbor search (find a closest point to a query point).
- * <p>
- * This is the efficient implementation using a 2D-Tree.
- */
-
 import edu.princeton.cs.algs4.Point2D;
 import edu.princeton.cs.algs4.RectHV;
+import edu.princeton.cs.algs4.Stack;
 import edu.princeton.cs.algs4.StdDraw;
-import edu.princeton.cs.algs4.SET;
-
-import java.util.ArrayList;
-import java.util.TreeSet;
+import edu.princeton.cs.algs4.StdOut;
 
 public class KdTree {
+    private Node root;
+    private int size;
 
-    /**
-     * Node inner class for your KD-Tree implementation,
-     * from the FAQ (feel free to modify).
-     */
     private static class Node {
-        private Point2D p;      // the point
-        private RectHV rect;    // the axis-aligned rectangle corresponding to this node
-        private Node lb;        // the left/bottom subtree
-        private Node rt;        // the right/top subtree
+        Point2D p;
+        RectHV rect;
+        Node lb, rt;
+
+        Node(Point2D p, RectHV rect) {
+            this.p = p;
+            this.rect = rect;
+        }
     }
 
-    /**
-     * An integer for the size of the canvas.
-     */
-    private static final int CANVAS_SIZE = 640;
-
-    /**
-     * A double for the size of the pen radius.
-     */
-    private static final double PEN_RADIUS = 0.01;
-
-    /**
-     * Constructs an empty set of points in the unit square.
-     */
     public KdTree() {
-        // TODO: your code here
     }
 
-    /**
-     * Returns true if the set is empty.
-     * @return whether the set is empty
-     */
     public boolean isEmpty() {
-        // TODO: your code here
-        return false;
+        return size == 0;
     }
 
-    /**
-     * Returns the number of points in the set.
-     * @return the number of points in the set
-     */
     public int size() {
-        // TODO: your code here
-        return 0;
+        return size;
     }
 
-    /**
-     * Adds the point to the set (if not already in the set).
-     * @param p the point to be inserted
-     * @throws IllegalArgumentException if p is null
-     */
     public void insert(Point2D p) {
-        // TODO: your code here
+        if (p == null) throw new IllegalArgumentException();
+        root = insert(root, p, true, 0, 0, 1, 1);
     }
 
-    /**
-     * Returns true if the set contains point p.
-     * @param p the point to be checked for
-     * @return true if the set contains point p
-     * @throws IllegalArgumentException if p is null
-     */
+    private Node insert(Node n, Point2D p, boolean vertical, double xmin, double ymin, double xmax, double ymax) {
+        if (n == null) {
+            size++;
+            return new Node(p, new RectHV(xmin, ymin, xmax, ymax));
+        }
+        if (n.p.equals(p)) return n;
+
+        if ((vertical && p.x() < n.p.x()) || (!vertical && p.y() < n.p.y())) {
+            if (vertical) n.lb = insert(n.lb, p, !vertical, xmin, ymin, n.p.x(), ymax);
+            else n.lb = insert(n.lb, p, !vertical, xmin, ymin, xmax, n.p.y());
+        } else {
+            if (vertical) n.rt = insert(n.rt, p, !vertical, n.p.x(), ymin, xmax, ymax);
+            else n.rt = insert(n.rt, p, !vertical, xmin, n.p.y(), xmax, ymax);
+        }
+        return n;
+    }
+
     public boolean contains(Point2D p) {
-        // TODO: your code here
-        return false;
+        if (p == null) throw new IllegalArgumentException();
+        return contains(root, p, true);
     }
 
-    /**
-     * Draws all points to standard draw.
-     */
+    private boolean contains(Node n, Point2D p, boolean vertical) {
+        if (n == null) return false;
+        if (n.p.equals(p)) return true;
+        if ((vertical && p.x() < n.p.x()) || (!vertical && p.y() < n.p.y()))
+            return contains(n.lb, p, !vertical);
+        else return contains(n.rt, p, !vertical);
+    }
+
     public void draw() {
-        // TODO: your code here - feel free to modify what is here
-        StdDraw.setCanvasSize(CANVAS_SIZE, CANVAS_SIZE);
-        StdDraw.setPenRadius(PEN_RADIUS);
+        draw(root, true);
     }
 
-    /**
-     * Returns all the points that are inside the rectangle.
-     * @param rect the rectangle
-     * @return all the points that are inside the rectangle
-     * @throws IllegalArgumentException if rect is null
-     */
+    private void draw(Node n, boolean vertical) {
+        if (n == null) return;
+        StdDraw.setPenRadius(0.01);
+        StdDraw.setPenColor(StdDraw.BLACK);
+        n.p.draw();
+
+        StdDraw.setPenRadius();
+        StdDraw.setPenColor(vertical ? StdDraw.RED : StdDraw.BLUE);
+        if (vertical)
+            StdDraw.line(n.p.x(), n.rect.ymin(), n.p.x(), n.rect.ymax());
+        else
+            StdDraw.line(n.rect.xmin(), n.p.y(), n.rect.xmax(), n.p.y());
+
+        draw(n.lb, !vertical);
+        draw(n.rt, !vertical);
+    }
+
     public Iterable<Point2D> range(RectHV rect) {
-        // TODO: your code here
-        return new ArrayList<>();
+        if (rect == null) throw new IllegalArgumentException();
+        Stack<Point2D> result = new Stack<>();
+        range(root, rect, result);
+        return result;
     }
 
-    /**
-     * Returns a nearest neighbor in the set to point p; null if the set is empty.
-     * @param p the point to be checked
-     * @return a nearest neighbor in the set to point p; null if the set is empty
-     * @throws IllegalArgumentException if p is null
-     */
+    private void range(Node n, RectHV query, Stack<Point2D> result) {
+        if (n == null || !query.intersects(n.rect)) return;
+        if (query.contains(n.p)) result.push(n.p);
+        range(n.lb, query, result);
+        range(n.rt, query, result);
+    }
+
     public Point2D nearest(Point2D p) {
-        // TODO: your code here
-        return new Point2D(0.0, 0.0);
+        if (p == null) throw new IllegalArgumentException();
+        if (isEmpty()) return null;
+        return nearest(root, p, root.p, true);
     }
 
-    /**
-     * Optional method for your testing.
-     * @param args the arguments
-     */
+    private Point2D nearest(Node n, Point2D target, Point2D best, boolean vertical) {
+        if (n == null || n.rect.distanceSquaredTo(target) >= best.distanceSquaredTo(target)) return best;
+
+        if (n.p.distanceSquaredTo(target) < best.distanceSquaredTo(target)) best = n.p;
+
+        Node first = (vertical && target.x() < n.p.x()) || (!vertical && target.y() < n.p.y()) ? n.lb : n.rt;
+        Node second = first == n.lb ? n.rt : n.lb;
+
+        best = nearest(first, target, best, !vertical);
+        best = nearest(second, target, best, !vertical);
+
+        return best;
+    }
+
     public static void main(String[] args) {
+
     }
 }
